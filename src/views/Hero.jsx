@@ -1,127 +1,114 @@
-import { BoxReveal } from "@//components/magicui/box-reveal";
-import TypingAnimation from "@/components/magicui/typing-animation";
-import { Dock, DockIcon } from "@/components/magicui/dock";
+import { siteContent } from "@/lib/site-data";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { gsap, registerGsapPlugins,} from "@/lib/gsap";
+import Container from "@/components/Container";
+import SectionWrapper from "@/components/SectionWrapper";
 
-function Hero() {
-  const Profession = ["Frontend Developer", "Autodidact UI Designer"];
+const Particles = lazy(() => import("@/UI/Particles"));
+
+function Hero({ reducedMotion = false }) {
+  const { hero } = siteContent;
+  const sectionRef = useRef(null);
+  const titleWords = hero.title.split(" ");
+
+  useEffect(() => {
+    const section = sectionRef.current;
+
+    if (!section || reducedMotion) {
+      return undefined;
+    }
+
+    registerGsapPlugins();
+
+    const context = gsap.context(() => {
+      const timeline = gsap.timeline({
+        defaults: {
+          ease: "power3.out",
+        },
+      });
+
+      timeline
+        .from("[data-hero-word]", {
+          yPercent: 110,
+          opacity: 0,
+          duration: 0.9,
+          stagger: 0.075,
+        })
+        .from(
+          "[data-hero-copy]",
+          {
+            y: 18,
+            opacity: 0,
+            duration: 0.7,
+          },
+          "-=0.42",
+        )
+        .from(
+          "[data-hero-background]",
+          {
+            opacity: 0,
+            scale: 1.04,
+            duration: 1.2,
+          },
+          0,
+        );
+    }, section);
+
+    return () => {
+      context.revert();
+    };
+  }, [reducedMotion]);
+
   return (
-    <section id="hero" role="banner" aria-labelledby="hero-title">
-      <div className="h-dvh w-full lg:w-3/4 mx-auto px-6 sm:px-8 flex flex-col justify-center">
-        <div className="w-full lg:w-1/2">
-          <BoxReveal duration={0.6}>
-            <h1 id="hero-title" className="text-neutral-100 text-5xl/tight">
-              Luis Rodriguez
-            </h1>
-          </BoxReveal>
-            <div className="w-max">
-              <TypingAnimation
-                texts={Profession}
-                typingSpeed={90}
-                pauseBetween={5000}
-                deleteSpeed={40}
-                initialDelay={500}
-                aria-label="Profession"
-              />
-            </div>
-          <BoxReveal duration={0.6}>
-            <p className="text-neutral-200 text-lg">
-              Transformo ideas en experiencias digitales modernas, accesibles y
-              eficientes con tecnología actual y diseño intuitivo.
-            </p>
-          </BoxReveal>
-          <BoxReveal duration={0.6}>
-            <div>
-              <Dock iconMagnification={50} iconDistance={70}>
-                <DockIcon>
-                  <a
-                    href="https://github.com/NeoBmo"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="cursor-none"
-                  >
-                    <Icons.gitHub className="size-7 grayscale-100 hover:grayscale-0 transition-all duration-300" />
-                  </a>
-                </DockIcon>
-                <DockIcon>
-                  <a
-                    href="https://www.linkedin.com/in/luisrodriguez-dev/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="cursor-none"
-                  >
-                    <Icons.linkedin className="size-7 grayscale-100 hover:grayscale-0 transition-all duration-300" />
-                  </a>
-                </DockIcon>
-                <DockIcon>
-                  <a
-                    href="https://bento.me/rdeveloper"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="cursor-none"
-                  >
-                    <Icons.bentome className="size-7 grayscale-100 hover:grayscale-0 transition-all duration-300" />
-                  </a>
-                </DockIcon>
-              </Dock>
-            </div>
-          </BoxReveal>
-        </div>
+    <SectionWrapper
+      id="hero"
+      ref={sectionRef}
+      labelledBy="hero-title"
+      className="flex min-h-svh items-center bg-background"
+    >
+      <div
+        data-hero-background
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+        aria-hidden="true"
+      >
+        <Suspense fallback={null}>
+          <Particles
+            particleCount={64}
+            particleSpread={8.4}
+            speed={0.055}
+            particleBaseSize={105}
+            particleHoverFactor={0.22}
+            className="absolute inset-0 h-full w-full opacity-90"
+          />
+        </Suspense>
       </div>
-    </section>
+      <Container className="flex min-h-svh items-end pb-16 pt-28 sm:pb-20 sm:pt-32 lg:pb-24 xl:pb-28">
+        <div className="grid w-full gap-7 md:max-w-5xl md:gap-9">
+          <h1
+            id="hero-title"
+            className="max-w-5xl text-balance text-[clamp(3.15rem,11vw,8.4rem)] font-semibold leading-[0.9] tracking-[-0.07em] text-white sm:tracking-[-0.08em]"
+          >
+            {titleWords.map((word, index) => (
+              <span key={`${word}-${index}`}>
+                <span className="inline-block overflow-hidden align-top">
+                  <span data-hero-word className="inline-block pr-[0.18em]">
+                    {word}
+                  </span>
+                </span>
+                {index < titleWords.length - 1 ? " " : null}
+              </span>
+            ))}
+          </h1>
+          <p
+            data-hero-copy
+            className="max-w-2xl text-sm leading-7 text-neutral-300 sm:text-base sm:leading-8 lg:text-lg lg:leading-8"
+          >
+            {hero.description}
+          </p>
+        </div>
+      </Container>
+    </SectionWrapper>
   );
 }
-const Icons = {
-  gitHub: (props) => (
-    <svg
-      viewBox="0 0 24 24"
-      fill="white"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <path d="M12 1C5.923 1 1 5.923 1 12c0 4.867 3.149 8.979 7.521 10.436.55.096.756-.233.756-.522 0-.262-.013-1.128-.013-2.049-2.764.509-3.479-.674-3.699-1.292-.124-.317-.66-1.293-1.127-1.554-.385-.207-.936-.715-.014-.729.866-.014 1.485.797 1.691 1.128.99 1.663 2.571 1.196 3.204.907.096-.715.385-1.196.701-1.471-2.448-.275-5.005-1.224-5.005-5.432 0-1.196.426-2.186 1.128-2.956-.111-.275-.496-1.402.11-2.915 0 0 .921-.288 3.024 1.128a10.193 10.193 0 0 1 2.75-.371c.936 0 1.871.123 2.75.371 2.104-1.43 3.025-1.128 3.025-1.128.605 1.513.221 2.64.111 2.915.701.77 1.127 1.747 1.127 2.956 0 4.222-2.571 5.157-5.019 5.432.399.344.743 1.004.743 2.035 0 1.471-.014 2.654-.014 3.025 0 .289.206.632.756.522C19.851 20.979 23 16.854 23 12c0-6.077-4.922-11-11-11Z" />
-    </svg>
-  ),
-  linkedin: (props) => (
-    <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg" {...props}>
-      <path
-        d="M8,72 L64,72 C68.418278,72 72,68.418278 72,64 L72,8 C72,3.581722 68.418278,-8.11624501e-16 64,0 L8,0 C3.581722,8.11624501e-16 -5.41083001e-16,3.581722 0,8 L0,64 C5.41083001e-16,68.418278 3.581722,72 8,72 Z"
-        fill="#007EBB"
-      />
-      <path
-        d="M62,62 L51.315625,62 L51.315625,43.8021149 C51.315625,38.8127542 49.4197917,36.0245323 45.4707031,36.0245323 C41.1746094,36.0245323 38.9300781,38.9261103 38.9300781,43.8021149 L38.9300781,62 L28.6333333,62 L28.6333333,27.3333333 L38.9300781,27.3333333 L38.9300781,32.0029283 C38.9300781,32.0029283 42.0260417,26.2742151 49.3825521,26.2742151 C56.7356771,26.2742151 62,30.7644705 62,40.051212 L62,62 Z M16.349349,22.7940133 C12.8420573,22.7940133 10,19.9296567 10,16.3970067 C10,12.8643566 12.8420573,10 16.349349,10 C19.8566406,10 22.6970052,12.8643566 22.6970052,16.3970067 C22.6970052,19.9296567 19.8566406,22.7940133 16.349349,22.7940133 Z M11.0325521,62 L21.769401,62 L21.769401,27.3333333 L11.0325521,27.3333333 L11.0325521,62 Z"
-        fill="#FFF"
-      />
-    </svg>
-  ),
-  bentome: (props) => (
-    <svg
-      viewBox="0 0 368 337"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <path
-        d="M34.469 187.163L129.625 261.633C148.656 276.529 158.172 283.977 169.148 286.767C178.805 289.222 189.195 289.222 198.851 286.767C209.828 283.977 219.344 276.529 238.375 261.633L333.531 187.163L333.671 187.069L333.742 187.019L333.859 186.927C352.656 172.188 362.101 164.774 365.648 156.231C367.218 152.454 367.999 148.531 367.999 144.608V192.608C367.999 196.531 367.218 200.454 365.648 204.231C362.085 212.81 352.578 220.252 333.601 235.116L333.531 235.163L238.375 309.633C219.344 324.529 209.828 331.976 198.851 334.767C189.195 337.222 178.805 337.222 169.148 334.767C158.172 331.976 148.656 324.529 129.625 309.633L34.469 235.163L34.3987 235.116C15.4222 220.252 5.91442 212.81 2.35192 204.231C0.781616 200.454 0.000367613 196.531 0.000367613 192.607V144.608C0.000367613 148.531 0.781616 152.454 2.35192 156.231C5.89879 164.774 15.3441 172.188 34.1409 186.927L34.2581 187.019L34.3284 187.069L34.469 187.163Z"
-        fill="#DBDBDB"
-      />
-      <path
-        d="M34.469 187.163C15.4359 172.267 5.91752 164.819 2.35192 156.231C-0.784465 148.677 -0.78373 140.54 2.35266 132.985C5.91826 124.397 15.4348 116.949 34.4679 102.054L129.625 27.5833C148.658 12.6878 158.174 5.24003 169.148 2.44957C178.801 -0.00499868 189.199 -0.00499868 198.852 2.44957C209.825 5.24003 219.342 12.6878 238.375 27.5833L333.532 102.054C352.565 116.949 362.082 124.397 365.647 132.985C368.784 140.54 368.784 148.677 365.648 156.231C362.082 164.819 352.564 172.267 333.531 187.163L238.375 261.633C219.344 276.529 209.828 283.977 198.851 286.767C189.195 289.222 178.805 289.222 169.148 286.767C158.172 283.977 148.656 276.529 129.625 261.633L34.469 187.163Z"
-        fill="white"
-      />
-      <path
-        d="M143.218 94.9613C133.702 87.5136 128.944 83.7897 127.161 79.4956C125.593 75.7184 125.593 71.6497 127.161 67.8725C128.944 63.5784 133.702 59.8545 143.218 52.4067L156.812 41.7681C166.329 34.3204 171.087 30.5965 176.574 29.2013C181.4 27.974 186.599 27.974 191.426 29.2013C196.913 30.5965 201.671 34.3204 211.188 41.7681L224.781 52.4067C234.298 59.8545 239.056 63.5784 240.839 67.8725C242.407 71.6497 242.407 75.7184 240.839 79.4956C239.056 83.7897 234.298 87.5136 224.781 94.9613L211.188 105.6C201.671 113.048 196.913 116.772 191.426 118.167C186.599 119.394 181.4 119.394 176.574 118.167C171.087 116.772 166.329 113.048 156.812 105.6L143.218 94.9613Z"
-        fill="#FF8686"
-      />
-      <path
-        d="M233.844 165.886C224.327 158.438 219.569 154.714 217.786 150.42C216.218 146.643 216.218 142.574 217.786 138.797C219.569 134.503 224.327 130.779 233.844 123.331L247.438 112.692C256.954 105.245 261.713 101.521 267.199 100.126C272.026 98.8982 277.225 98.8982 282.051 100.126C287.538 101.521 292.296 105.245 301.813 112.692L315.407 123.331C324.923 130.779 329.682 134.503 331.464 138.797C333.033 142.574 333.033 146.643 331.464 150.42C329.682 154.714 324.923 158.438 315.407 165.886L301.813 176.524C292.296 183.972 287.538 187.696 282.051 189.091C277.225 190.318 272.026 190.318 267.199 189.091C261.713 187.696 256.954 183.972 247.438 176.524L233.844 165.886Z"
-        fill="#5AFF88"
-      />
-      <path
-        d="M52.593 165.886C43.0765 158.438 38.3182 154.714 36.5354 150.42C34.9672 146.643 34.9672 142.574 36.5354 138.797C38.3182 134.503 43.0765 130.779 52.593 123.331L66.1868 112.692C75.7034 105.245 80.4617 101.521 85.9486 100.126C90.775 98.8982 95.974 98.8982 100.8 100.126C106.287 101.521 111.046 105.245 120.562 112.692L224.781 194.255C234.298 201.703 239.056 205.427 240.839 209.721C242.407 213.498 242.407 217.567 240.839 221.344C239.056 225.638 234.298 229.362 224.781 236.81L211.188 247.448C201.671 254.896 196.913 258.62 191.426 260.015C186.599 261.243 181.4 261.243 176.574 260.015C171.087 258.62 166.329 254.896 156.812 247.448L52.593 165.886Z"
-        fill="#768CFF"
-      />
-    </svg>
-  ),
-};
 
 export default Hero;

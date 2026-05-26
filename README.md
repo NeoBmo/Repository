@@ -1,43 +1,34 @@
-# Portafolio Web
+# NeoBmo Portfolio
 
-Este repositorio contiene el desarrollo de mi portafolio personal.  
-El objetivo es presentar mi trabajo, trayectoria y habilidades como desarrollador web.  
-Actualmente no es la versión definitiva, sino la base sobre la cual seguiré construyendo y mejorando.
+**Version:** 6.2  
+**Status:** In development
 
----
+Frontend portfolio focused on visual experience, cinematic motion, and a dark technical minimalist design language. The project is built as an interactive web experience, not as a static presentation or generic portfolio template.
 
-## Mejoras previstas
+## Tech Stack
 
-A continuación, una lista de ajustes y funcionalidades que planeo implementar para optimizar la experiencia, accesibilidad y rendimiento:
+- React
+- Vite
+- GSAP
+- TailwindCSS
+- OGL / Three.js
+- ESLint
 
-- Botón de cambio de tema (oscuro ↔ claro) con animación estilo *Star Wars*.  
-- Integrar cambio automático de idioma con soporte para internacionalización.  
-- Optimizar la carga inicial de la página, evitando precargar componentes innecesarios.  
-- Implementar `React.lazy` y `React.memo` para mejorar rendimiento.  
-- Ajustar secciones con un enfoque en **SEO, accesibilidad (ARIA) y semántica**.  
-- Incluir variantes de grosor en la tipografía para mayor jerarquía visual.  
-- Refinar y optimizar el archivo `styles.css`.  
-- Agregar animaciones con **GSAP** para una experiencia más dinámica.  
-- Mejorar la presentación de íconos en el footer, haciéndolos más atractivos.  
-- En dispositivos móviles:
-  - Desactivar el cursor.  
-  - Programar que los íconos reaccionen de forma táctil similar al hover en escritorio.  
-- Mejorar el botón de contacto con interacciones más claras y efectivas.  
-- Rediseñar la sección de testimonios para que sea más fluida en mobile.  
+## Project Philosophy
 
----
+- Dark minimalism with a restrained pink accent.
+- Controlled motion with clear visual intent.
+- Strict consistency across layout, typography, interaction, and motion.
+- Performance treated as a design constraint from the start.
+- Custom visual decisions over generic template patterns.
 
-## Créditos y Recursos Externos
+## Development Status
 
-- **Logotipos y marcas**: algunos de los logos utilizados en este portafolio no son de mi autoría.  
-  Se incluyen únicamente con fines ilustrativos y son propiedad de sus respectivos dueños.  
+This project is in active development. Structure, motion details, visual composition, and performance decisions may continue to evolve before a stable final version.
 
-- **Librerías externas**:  
-  - [MagicUI](https://magicui.design/), utilizada bajo su licencia open source.  
-  - Otros recursos (íconos, tipografías, ilustraciones) empleados bajo licencias libres o de uso abierto.  
+## Technical Notes
 
----
-
-## Licencia
-
-Este proyecto está bajo la licencia [MIT](LICENSE).
+- Sections are organized modularly by view.
+- GSAP animations are scoped per section and cleaned up after use.
+- Heavy visual effects are limited by a performance budget.
+- Motion is designed to support the content, not compete with it.
