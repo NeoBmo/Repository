@@ -7,13 +7,15 @@
     "dev": "astro dev",
     "build": "astro check && astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "prepare:painting": "node scripts/prepare-painting.mjs"
   },
   "dependencies": {
     "astro": "^7.4.4"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
+    "sharp": "^0.35.5",
     "typescript": "^6.0.3"
   }
 }
