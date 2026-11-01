@@ -25,7 +25,12 @@ Cada push a `main` publica en GitHub Pages mediante `.github/workflows/deploy.ym
 
 ## Pintura
 
-El hero se dibuja a partir de *La noche estrellada* (Vincent van Gogh, 1889), obra de dominio público. `npm run prepare:painting <imagen>` reduce cualquier reproducción al recurso compacto que se muestrea en tiempo real (`src/assets/starry-night.webp`).
+El hero se dibuja a partir de *La noche estrellada* (Vincent van Gogh, 1889), obra de dominio público. `npm run prepare:painting <imagen>` genera, desde una sola reproducción, los dos recursos que se muestrean en tiempo real:
+
+- `starry-night.webp`: la pintura completa, para pantallas horizontales.
+- `starry-night-portrait.webp`: una reinterpretación vertical armada con piezas de la propia obra (luna, ciprés, remolinos, pueblo), para teléfonos.
+
+Cada pantalla descarga solo la versión que necesita.
 
 ## Licencias
 
