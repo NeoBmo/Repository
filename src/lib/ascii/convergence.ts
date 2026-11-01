@@ -29,11 +29,14 @@ const SWEEP = 0.3;
 
 export interface ConvergenceOptions {
   canvas: HTMLCanvasElement;
-  field: ImageField;
   fontFamily: string;
-  /** Focal point of the cover crop, 0–1 on each axis. */
-  focus?: { x: number; y: number };
   seed?: number;
+}
+
+export interface Painting {
+  field: ImageField;
+  /** Focal point of the cover crop, 0–1 on each axis. */
+  focus: { x: number; y: number };
 }
 
 /**
@@ -43,12 +46,12 @@ export interface ConvergenceOptions {
 export class Convergence {
   private readonly context: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
-  private readonly field: ImageField;
   private readonly fontFamily: string;
-  private readonly focus: { x: number; y: number };
   private readonly seed: number;
   private readonly colorLayer = document.createElement("canvas");
 
+  private field!: ImageField;
+  private focus = { x: 0.5, y: 0.5 };
   private atlas!: GlyphAtlas;
   private width = 0;
   private height = 0;
@@ -73,18 +76,18 @@ export class Convergence {
   private angle = new Float32Array(0);
   private coherence = new Float32Array(0);
 
-  constructor({ canvas, field, fontFamily, focus = { x: 0.5, y: 0.5 }, seed = 1890 }: ConvergenceOptions) {
+  constructor({ canvas, fontFamily, seed = 1890 }: ConvergenceOptions) {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D canvas is not available");
     this.context = context;
     this.canvas = canvas;
-    this.field = field;
     this.fontFamily = fontFamily;
-    this.focus = focus;
     this.seed = seed;
   }
 
-  layout(width: number, height: number, pixelRatio: number) {
+  layout(width: number, height: number, pixelRatio: number, painting: Painting) {
+    this.field = painting.field;
+    this.focus = painting.focus;
     this.width = width;
     this.height = height;
     this.pixelRatio = pixelRatio;

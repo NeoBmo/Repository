@@ -1,22 +1,35 @@
-import paintingUrl from "../assets/starry-night.webp?url";
-import { loadImageField } from "../lib/ascii/image-field";
-import { Convergence, INTRO_DURATION } from "../lib/ascii/convergence";
+import landscapeUrl from "../assets/starry-night.webp?url";
+import portraitUrl from "../assets/starry-night-portrait.webp?url";
+import { loadImageField, type ImageField } from "../lib/ascii/image-field";
+import { Convergence, INTRO_DURATION, type Painting } from "../lib/ascii/convergence";
 
 const FONT_FAMILY = '"JetBrains Mono", monospace';
 /** After the intro the painting only breathes, so 30 fps is plenty. */
 const IDLE_FRAME_MS = 1000 / 30;
+/** Below this aspect ratio the vertical composition fits better. */
+const PORTRAIT_QUERY = "(max-aspect-ratio: 6/7)";
+
+const VARIANTS = {
+  landscape: { url: landscapeUrl, focus: { x: 0.4, y: 0.5 } },
+  portrait: { url: portraitUrl, focus: { x: 0.5, y: 0.5 } },
+};
+
+const fields = new Map<string, Promise<ImageField>>();
+
+/** Each variant is fetched only when a screen of that shape needs it. */
+async function paintingFor(portrait: boolean): Promise<Painting> {
+  const { url, focus } = VARIANTS[portrait ? "portrait" : "landscape"];
+  if (!fields.has(url)) fields.set(url, loadImageField(url));
+  return { field: await fields.get(url)!, focus };
+}
 
 export async function mountHero(section: HTMLElement) {
   const canvas = section.querySelector("canvas");
   if (!canvas) return;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  const [field] = await Promise.all([
-    loadImageField(paintingUrl),
-    document.fonts.load(`600 12px ${FONT_FAMILY}`),
-  ]);
-
-  const scene = new Convergence({ canvas, field, fontFamily: FONT_FAMILY, focus: { x: 0.4, y: 0.5 } });
+  const portrait = window.matchMedia(PORTRAIT_QUERY);
+  const scene = new Convergence({ canvas, fontFamily: FONT_FAMILY });
 
   let elapsed = 0;
   let lastFrame = 0;
@@ -24,9 +37,10 @@ export async function mountHero(section: HTMLElement) {
   let frame = 0;
   let visible = true;
 
-  const layout = () => {
+  const layout = async () => {
+    const painting = await paintingFor(portrait.matches);
     const { width, height } = canvas.getBoundingClientRect();
-    scene.layout(width, height, Math.min(window.devicePixelRatio || 1, 2));
+    scene.layout(width, height, Math.min(window.devicePixelRatio || 1, 2), painting);
     scene.render(elapsed, reducedMotion.matches);
   };
 
@@ -50,6 +64,9 @@ export async function mountHero(section: HTMLElement) {
     frame = 0;
   };
 
+  await document.fonts.load(`600 12px ${FONT_FAMILY}`);
+  await layout();
+
   let resizeTimer = 0;
   new ResizeObserver(() => {
     clearTimeout(resizeTimer);
@@ -68,7 +85,6 @@ export async function mountHero(section: HTMLElement) {
     play();
   });
 
-  layout();
   section.dataset.ready = "";
   play();
 }
