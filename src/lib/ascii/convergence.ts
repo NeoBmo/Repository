@@ -3,14 +3,19 @@ import { createGlyphAtlas, type GlyphAtlas } from "./glyph-atlas";
 import { EMPTY, NOISE_INDEX, glyphFor } from "./glyphs";
 import { clamp, createRandom, easeInOutCubic, easeOutCubic, lerp, smoothstep } from "./math";
 
-/** Seconds. Every character waits, travels, lands; then colour and life arrive. */
+/**
+ * Seconds. Characters appear one by one, few at first and then many; each
+ * travels, lands, and only then do colour and life arrive.
+ */
 const TIMING = {
-  chaos: 0.8,
-  stagger: 1.5,
-  travel: 1.8,
-  colorStart: 2.6,
-  colorDuration: 1.8,
-  lifeStart: 4,
+  revealStart: 0.2,
+  reveal: 1.6,
+  departure: 1.4,
+  stagger: 1.4,
+  travel: 1.7,
+  colorStart: 3.2,
+  colorDuration: 1.6,
+  lifeStart: 4.4,
   lifeDuration: 2.5,
 };
 
@@ -61,7 +66,8 @@ export class Convergence {
   private dirX = new Float32Array(0);
   private dirY = new Float32Array(0);
   private phase = new Float32Array(0);
-  private delay = new Float32Array(0);
+  private appear = new Float32Array(0);
+  private departure = new Float32Array(0);
   private noise = new Float32Array(0);
   private luminance = new Float32Array(0);
   private angle = new Float32Array(0);
@@ -123,7 +129,8 @@ export class Convergence {
     const flicker = Math.floor(time * 12);
 
     for (let i = 0; i < this.count; i++) {
-      const progress = easeInOutCubic(clamp((t - TIMING.chaos - this.delay[i]) / TIMING.travel));
+      if (t < this.appear[i]) continue;
+      const progress = easeInOutCubic(clamp((t - this.departure[i]) / TIMING.travel));
       let x: number;
       let y: number;
       let glyph: number;
@@ -209,7 +216,8 @@ export class Convergence {
     this.dirX = new Float32Array(capacity);
     this.dirY = new Float32Array(capacity);
     this.phase = new Float32Array(capacity);
-    this.delay = new Float32Array(capacity);
+    this.appear = new Float32Array(capacity);
+    this.departure = new Float32Array(capacity);
     this.noise = new Float32Array(capacity);
     this.luminance = new Float32Array(capacity);
     this.angle = new Float32Array(capacity);
@@ -237,8 +245,13 @@ export class Convergence {
         this.dirX[n] = Math.cos(angle);
         this.dirY[n] = Math.sin(angle);
         this.phase[n] = (hx * this.dirX[n] + hy * this.dirY[n]) / wavelength;
-        // Light arrives first: stars, then sky, then the village and cypress.
-        this.delay[n] = ((1 - lum) * 0.7 + random() * 0.3) * TIMING.stagger;
+        // sqrt skews arrivals late, so the noise grows from a few glyphs to a crowd.
+        this.appear[n] = TIMING.revealStart + Math.sqrt(random()) * TIMING.reveal;
+        // Light leaves first: stars, then sky, then the village and cypress.
+        this.departure[n] = Math.max(
+          this.appear[n] + 0.2,
+          TIMING.departure + ((1 - lum) * 0.7 + random() * 0.3) * TIMING.stagger,
+        );
         this.noise[n] = random();
         this.trace(n, hx, hy, step, random);
         n++;
