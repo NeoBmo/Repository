@@ -1,0 +1,16 @@
+---
+import { getCollection } from "astro:content";
+import { href } from "../lib/url";
+
+const sections = (await getCollection("sections")).sort((a, b) => a.data.order - b.data.order);
+---
+
+{
+  sections.map(({ id, data }) => (
+    <section class="teaser" id={id} aria-labelledby={`${id}-title`}>
+      <h2 id={`${id}-title`}>{data.title}</h2>
+      <p>{data.summary}</p>
+      <a href={href(id)}>Seguir leyendo</a>
+    </section>
+  ))
+}

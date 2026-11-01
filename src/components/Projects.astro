@@ -1,0 +1,27 @@
+---
+import { getCollection } from "astro:content";
+import { href } from "../lib/url";
+
+const projects = (await getCollection("projects")).sort((a, b) => a.data.order - b.data.order);
+---
+
+{
+  projects.length > 0 && (
+    <section class="projects" id="proyectos" aria-labelledby="projects-title">
+      <h2 id="projects-title">Proyectos</h2>
+      <ul role="list">
+        {projects.map(({ id, data }) => (
+          <li>
+            <article>
+              <h3>
+                <a href={href(`proyectos/${id}`)}>{data.title}</a>
+              </h3>
+              <p>{data.status} · {data.strength}</p>
+              <p>{data.summary}</p>
+            </article>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}

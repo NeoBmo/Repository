@@ -1,0 +1,27 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Base from "../layouts/Base.astro";
+import { href } from "../lib/url";
+
+export async function getStaticPaths() {
+  const sections = await getCollection("sections");
+  return sections.map((section) => ({ params: { section: section.id }, props: { section } }));
+}
+
+interface Props {
+  section: CollectionEntry<"sections">;
+}
+
+const { section } = Astro.props;
+const { Content } = await render(section);
+---
+
+<Base title={`${section.data.title} — NeoBmo`} description={section.data.summary}>
+  <main>
+    <a href={href(`#${section.id}`)}>Volver</a>
+    <article>
+      <h1>{section.data.title}</h1>
+      <Content />
+    </article>
+  </main>
+</Base>
