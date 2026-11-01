@@ -1,0 +1,16 @@
+:root {
+  --color-void: #000;
+  --color-signal: #fff;
+  --color-dim: #8a8a8a;
+
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --text-sm: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem);
+  --text-base: clamp(0.9375rem, 0.9rem + 0.2vw, 1.0625rem);
+  --text-lg: clamp(1.25rem, 1.1rem + 0.7vw, 1.75rem);
+  --text-xl: clamp(2rem, 1.4rem + 3vw, 4.5rem);
+
+  --space-gutter: clamp(1rem, 0.6rem + 2vw, 2.5rem);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
