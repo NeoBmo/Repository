@@ -23,6 +23,15 @@ npm run dev
 
 Cada push a `main` publica en GitHub Pages mediante `.github/workflows/deploy.yml`.
 
+## Contenido
+
+Todo el texto vive en Markdown, con dos profundidades: el `summary` del frontmatter es la vista rápida en la página principal y el cuerpo es la historia completa en su propia página.
+
+- `src/content/sections/*.md` → secciones (`sobre-mi.md` → `/sobre-mi`).
+- `src/content/projects/*.md` → proyectos (`blog.md` → `/proyectos/blog`).
+
+Los campos de cada colección están en `src/content.config.ts`. Una sección o proyecto aparece en el sitio en cuanto existe su archivo.
+
 ## Pintura
 
 El hero se dibuja a partir de *La noche estrellada* (Vincent van Gogh, 1889), obra de dominio público. `npm run prepare:painting <imagen>` genera, desde una sola reproducción, los dos recursos que se muestrean en tiempo real:
