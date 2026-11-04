@@ -48,6 +48,7 @@ export async function mountHero(section: HTMLElement) {
     frame = requestAnimationFrame(tick);
     elapsed += Math.min((now - (lastFrame || now)) / 1000, 0.1);
     lastFrame = now;
+    if (elapsed > INTRO_DURATION) section.dataset.settled ??= "";
     if (elapsed > INTRO_DURATION && now - lastDraw < IDLE_FRAME_MS) return;
     lastDraw = now;
     scene.render(elapsed);
