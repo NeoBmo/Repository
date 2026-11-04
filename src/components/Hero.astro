@@ -8,20 +8,16 @@
 
 <script>
   import { mountHero } from "../scripts/hero";
-  import { mountTerminal } from "../scripts/terminal";
 
   const section = document.querySelector<HTMLElement>("[data-hero]");
-  if (section) {
-    mountTerminal(section);
-    mountHero(section);
-  }
+  if (section) mountHero(section);
 </script>
 
 <style>
   /* La altura extra es el recorrido de scroll que escribe la terminal. */
   .hero {
     position: relative;
-    height: 280svh;
+    height: 320svh;
     background: var(--color-void);
   }
 
@@ -60,12 +56,24 @@
     transition: opacity 0.2s var(--ease-out);
   }
 
-  .hero[data-settled] .hero__terminal,
-  .hero[data-typing] .hero__terminal {
+  .hero[data-settled] .hero__terminal {
     opacity: 1;
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    /* La consola se enciende como un tubo: una línea que se abre hacia arriba. */
+    .hero__terminal {
+      transform: scaleY(0.04);
+      transform-origin: left bottom;
+      transition:
+        opacity 0.2s var(--ease-out),
+        transform 0.25s var(--ease-out);
+    }
+
+    .hero[data-settled] .hero__terminal {
+      transform: none;
+    }
+
     .hero__cursor {
       animation: blink 1s steps(1) infinite;
     }

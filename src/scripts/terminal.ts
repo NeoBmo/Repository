@@ -1,7 +1,8 @@
 import { clamp } from "../lib/ascii/math";
+import { LOGO_SCROLL } from "../lib/choreography";
 import { lineAt } from "../lib/terminal";
 
-export function mountTerminal(section: HTMLElement) {
+export function mountTerminal(section: HTMLElement, onProgress: (progress: number) => void) {
   const line = section.querySelector<HTMLElement>("[data-terminal-line]");
   const stage = section.querySelector<HTMLElement>(".hero__stage");
   if (!line || !stage) return;
@@ -15,8 +16,8 @@ export function mountTerminal(section: HTMLElement) {
     const travel = section.offsetHeight - stage.offsetHeight;
     // Sin recorrido (reduced motion) el hero no se desplaza: va directo al nombre.
     const progress = travel > 0 ? clamp(-section.getBoundingClientRect().top / travel) : 1;
-    section.toggleAttribute("data-typing", progress > 0);
-    const text = lineAt(progress);
+    onProgress(progress);
+    const text = lineAt(clamp((progress - LOGO_SCROLL) / (1 - LOGO_SCROLL)));
     if (line.textContent !== text) line.textContent = text;
   };
 

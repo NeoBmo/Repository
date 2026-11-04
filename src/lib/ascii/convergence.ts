@@ -27,6 +27,16 @@ const POINTS = STROKE_STEPS + 2;
 /** Share of the journey spent flying from the noise into the stroke. */
 const SWEEP = 0.3;
 
+/** Tamaño máximo y altura del logo, como proporción de la pantalla. */
+const LOGO_WIDTH = 0.85;
+const LOGO_HEIGHT = 0.5;
+const LOGO_TOP = 0.42;
+/** Parte de la disolución que dura el viaje de cada carácter hasta el logo. */
+const LOGO_TRAVEL = 0.6;
+/** Curvatura del viaje: sale siguiendo su pincelada antes de ir al logo. */
+const LOGO_ARC = 0.25;
+const LOGO_GLYPH = glyphFor(1, 0, 0);
+
 export interface ConvergenceOptions {
   canvas: HTMLCanvasElement;
   fontFamily: string;
@@ -75,6 +85,11 @@ export class Convergence {
   private luminance = new Float32Array(0);
   private angle = new Float32Array(0);
   private coherence = new Float32Array(0);
+  private inLogo = new Uint8Array(0);
+  private logoX = new Float32Array(0);
+  private logoY = new Float32Array(0);
+  private logoDelay = new Float32Array(0);
+  private fade = new Float32Array(0);
 
   constructor({ canvas, fontFamily, seed = 1890 }: ConvergenceOptions) {
     const context = canvas.getContext("2d");
@@ -85,7 +100,7 @@ export class Convergence {
     this.seed = seed;
   }
 
-  layout(width: number, height: number, pixelRatio: number, painting: Painting) {
+  layout(width: number, height: number, pixelRatio: number, painting: Painting, logo: HTMLImageElement) {
     this.field = painting.field;
     this.focus = painting.focus;
     this.width = width;
@@ -113,15 +128,20 @@ export class Convergence {
     };
 
     this.populate(this.sampleCells());
+    this.formLogo(logo);
   }
 
-  /** Draws the scene at `time` seconds. `still` skips motion entirely. */
-  render(time: number, still = false) {
+  /**
+   * Draws the scene at `time` seconds. `still` skips motion entirely.
+   * `dissolve` (0–1) lleva de la pintura al logo y funciona en ambos sentidos.
+   */
+  render(time: number, still = false, dissolve = 0) {
     const { context, atlas } = this;
     const { cellWidth, cellHeight, sourceWidth, sourceHeight } = atlas;
     const t = still ? Infinity : time;
     const life = still ? 0 : smoothstep(TIMING.lifeStart, TIMING.lifeStart + TIMING.lifeDuration, t);
-    const color = still ? 1 : easeInOutCubic(clamp((t - TIMING.colorStart) / TIMING.colorDuration));
+    const base = still ? 1 : easeInOutCubic(clamp((t - TIMING.colorStart) / TIMING.colorDuration));
+    const color = base * (1 - dissolve);
 
     context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
     context.globalCompositeOperation = "source-over";
@@ -134,12 +154,23 @@ export class Convergence {
 
     for (let i = 0; i < this.count; i++) {
       if (t < this.appear[i]) continue;
+      // Los caracteres que no forman el logo desaparecen uno a uno, sin transparencia.
+      if (!this.inLogo[i] && dissolve > this.fade[i]) continue;
+      const toLogo = this.inLogo[i]
+        ? easeInOutCubic(clamp((dissolve - this.logoDelay[i]) / LOGO_TRAVEL))
+        : 0;
       const progress = easeInOutCubic(clamp((t - this.departure[i]) / TIMING.travel));
       let x: number;
       let y: number;
       let glyph: number;
 
-      if (progress >= 1) {
+      if (toLogo > 0) {
+        [x, y] = this.logoPositionAt(i, toLogo);
+        glyph =
+          toLogo > 0.9
+            ? LOGO_GLYPH
+            : NOISE_INDEX[(flicker + ((this.noise[i] * 997) | 0)) % NOISE_INDEX.length];
+      } else if (progress >= 1) {
         const wave = life > 0 ? Math.sin(this.phase[i] - time * 1.4) * life : 0;
         const drift = wave * 0.2 * cellWidth;
         x = this.homeX[i] + this.dirX[i] * drift;
@@ -295,6 +326,72 @@ export class Convergence {
       path[base + k * 2] = x;
       path[base + k * 2 + 1] = y;
     }
+  }
+
+  /** Reparte al azar las celdas del logo entre los caracteres de la pintura. */
+  private formLogo(logo: HTMLImageElement) {
+    const { width, height, count } = this;
+    const { cellWidth, cellHeight } = this.atlas;
+    const random = createRandom(this.seed + 1);
+
+    this.inLogo = new Uint8Array(count);
+    this.logoX = new Float32Array(count);
+    this.logoY = new Float32Array(count);
+    this.logoDelay = new Float32Array(count);
+    this.fade = new Float32Array(count);
+
+    for (let n = 0; n < count; n++) {
+      this.logoDelay[n] = random() * (1 - LOGO_TRAVEL);
+      this.fade[n] = 0.1 + random() * 0.8;
+    }
+
+    const size = Math.min(width * LOGO_WIDTH, height * LOGO_HEIGHT);
+    const cols = Math.round(size / cellWidth);
+    const rows = Math.round(size / cellHeight);
+    // Sin logo cargado o sin espacio, la pintura se disuelve igual y llega la consola.
+    if (!logo.naturalWidth || cols < 1 || rows < 1) return;
+
+    const layer = document.createElement("canvas");
+    layer.width = cols;
+    layer.height = rows;
+    const context = layer.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas is not available");
+    context.drawImage(logo, 0, 0, cols, rows);
+    const { data } = context.getImageData(0, 0, cols, rows);
+
+    const order = Uint32Array.from({ length: count }, (_, i) => i);
+    for (let i = count - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+
+    const left = (width - cols * cellWidth) / 2;
+    const top = (height - rows * cellHeight) * LOGO_TOP;
+    let used = 0;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols && used < count; col++) {
+        if (data[(row * cols + col) * 4 + 3] < 128) continue;
+        const n = order[used++];
+        this.inLogo[n] = 1;
+        this.logoX[n] = left + (col + 0.5) * cellWidth;
+        this.logoY[n] = top + (row + 0.5) * cellHeight;
+      }
+    }
+  }
+
+  private logoPositionAt(n: number, progress: number): [number, number] {
+    const startX = this.homeX[n];
+    const startY = this.homeY[n];
+    const endX = this.logoX[n];
+    const endY = this.logoY[n];
+    const distance = Math.hypot(endX - startX, endY - startY);
+    const controlX = (startX + endX) / 2 + this.dirX[n] * distance * LOGO_ARC;
+    const controlY = (startY + endY) / 2 + this.dirY[n] * distance * LOGO_ARC;
+    return [
+      lerp(lerp(startX, controlX, progress), lerp(controlX, endX, progress), progress),
+      lerp(lerp(startY, controlY, progress), lerp(controlY, endY, progress), progress),
+    ];
   }
 
   private positionAt(n: number, progress: number): [number, number] {
