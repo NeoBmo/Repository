@@ -1,5 +1,5 @@
 import { clamp } from "../lib/ascii/math";
-import { LOGO_SCROLL } from "../lib/choreography";
+import { afterLogo } from "../lib/choreography";
 import { lineAt } from "../lib/terminal";
 
 export function mountTerminal(section: HTMLElement, onProgress: (progress: number) => void) {
@@ -17,7 +17,7 @@ export function mountTerminal(section: HTMLElement, onProgress: (progress: numbe
     // Sin recorrido (reduced motion) el hero no se desplaza: va directo al nombre.
     const progress = travel > 0 ? clamp(-section.getBoundingClientRect().top / travel) : 1;
     onProgress(progress);
-    const text = lineAt(clamp((progress - LOGO_SCROLL) / (1 - LOGO_SCROLL)));
+    const text = lineAt(afterLogo(progress));
     if (line.textContent !== text) line.textContent = text;
   };
 

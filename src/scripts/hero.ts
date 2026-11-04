@@ -11,6 +11,9 @@ import {
   LOGO_SCROLL,
   MAX_RATE,
   RATE_RESPONSE,
+  STAGE_RESPONSE,
+  afterLogo,
+  stageAt,
 } from "../lib/choreography";
 import { mountTerminal } from "./terminal";
 
@@ -56,8 +59,9 @@ export async function mountHero(section: HTMLElement) {
   let visible = true;
   let rate = 1;
   let progress = 0;
-  let dissolve = 0;
-  let drawnDissolve = -1;
+  // Un solo número recorre toda la obra: 0–1 pintura → logo, 1–4 logo → nombres → línea.
+  let position = 0;
+  let drawnPosition = -1;
   // La intro mantiene el logo hasta que el visitante baja; desde ahí manda el scroll,
   // así que al volver arriba la pintura se queda quieta y no se disuelve sola.
   let introHolds = true;
@@ -68,15 +72,20 @@ export async function mountHero(section: HTMLElement) {
   logo.src = logoUrl;
 
   // Reduced motion siempre muestra la pintura fija, sin importar dónde iba la coreografía.
-  const drawStill = () => scene.render(elapsed, reducedMotion.matches, reducedMotion.matches ? 0 : dissolve);
+  const draw = () => {
+    if (reducedMotion.matches) scene.render(elapsed, true);
+    else if (position > 1) scene.renderFormation(position - 1, elapsed);
+    else scene.render(elapsed, false, position);
+  };
 
   const layout = async () => {
     const painting = await paintingFor(portrait.matches);
     const { width, height } = canvas.getBoundingClientRect();
     const maxPixelRatio = portrait.matches ? PORTRAIT_MAX_PIXEL_RATIO : MAX_PIXEL_RATIO;
     const pixelRatio = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
-    scene.layout(width, height, pixelRatio, painting, logo);
-    drawStill();
+    scene.layout(width, height, pixelRatio, painting, logo, portrait.matches);
+    draw();
+    drawnPosition = position;
   };
 
   const tick = (now: number) => {
@@ -96,20 +105,27 @@ export async function mountHero(section: HTMLElement) {
     }
 
     if (!introRunning && progress >= LOGO_SCROLL) introHolds = false;
-    dissolve = introHolds
+    const dissolve = introHolds
       ? clamp((elapsed - DISSOLVE_START) / DISSOLVE_DURATION)
       : clamp(progress / LOGO_SCROLL);
+    const target = dissolve + (introRunning ? 0 : stageAt(afterLogo(progress)));
 
-    if (dissolve === drawnDissolve) {
-      if (dissolve === 1) return;
+    // La intro va exacta al reloj; después los caracteres persiguen al scroll,
+    // así que incluso un salto brusco, en cualquier sentido, viaja suave.
+    if (introRunning) position = target;
+    else position += (target - position) * Math.min(delta * STAGE_RESPONSE, 1);
+    if (Math.abs(target - position) < 0.001) position = target;
+
+    if (position === drawnPosition) {
+      if (position >= 1) return;
       const idleFrameMs = portrait.matches ? PORTRAIT_IDLE_FRAME_MS : IDLE_FRAME_MS;
       if (elapsed > INTRO_DURATION && now - lastDraw < idleFrameMs) return;
     }
 
-    section.toggleAttribute("data-settled", dissolve === 1);
-    drawnDissolve = dissolve;
+    section.toggleAttribute("data-settled", position >= 1);
+    drawnPosition = position;
     lastDraw = now;
-    scene.render(elapsed, false, dissolve);
+    draw();
   };
 
   const play = () => {
@@ -142,8 +158,8 @@ export async function mountHero(section: HTMLElement) {
   reducedMotion.addEventListener("change", () => {
     pause();
     section.toggleAttribute("data-settled", reducedMotion.matches);
-    drawnDissolve = -1;
-    drawStill();
+    drawnPosition = -1;
+    draw();
     play();
   });
 

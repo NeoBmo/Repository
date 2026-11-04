@@ -1,3 +1,5 @@
+import { clamp, lerp } from "./ascii/math";
+
 /** Segundos de la coreografía automática: pintura → contemplación → logo. */
 export const DISSOLVE_START = 6.3;
 export const DISSOLVE_DURATION = 1.4;
@@ -10,3 +12,30 @@ export const LOGO_SCROLL = 0.12;
 export const MAX_RATE = 8;
 /** Qué tan rápido el ritmo alcanza su objetivo, por segundo. */
 export const RATE_RESPONSE = 2.5;
+/** Qué tan rápido los caracteres alcanzan al scroll, por segundo. */
+export const STAGE_RESPONSE = 8;
+
+/**
+ * Pares [avance del scroll tras el logo, formación]. Dos paradas con la misma
+ * formación son una pausa: logo → NeoBmo → Luis Rodríguez → línea.
+ */
+const STAGES = [
+  [0, 0],
+  [0.28, 1],
+  [0.45, 1],
+  [0.72, 2],
+  [0.88, 2],
+  [1, 3],
+] as const;
+
+/** Tramo del scroll que usa el hero tras el logo, de 0 a 1. */
+export const afterLogo = (progress: number) => clamp((progress - LOGO_SCROLL) / (1 - LOGO_SCROLL));
+
+export function stageAt(scroll: number) {
+  const value = clamp(scroll);
+  const next = STAGES.findIndex(([stop]) => stop >= value);
+  if (next <= 0) return STAGES[0][1];
+  const [startScroll, startStage] = STAGES[next - 1];
+  const [endScroll, endStage] = STAGES[next];
+  return lerp(startStage, endStage, (value - startScroll) / (endScroll - startScroll));
+}

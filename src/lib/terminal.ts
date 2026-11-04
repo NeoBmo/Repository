@@ -3,8 +3,8 @@ import { clamp } from "./ascii/math";
 const GREETING = "hola, soy NeoBmo";
 const NAME = "Luis Rodríguez";
 
-/** Puntos del recorrido de scroll (0–1) donde cambia lo que hace la terminal. */
-const TIMELINE = { typed: 0.4, eraseStart: 0.5, erased: 0.65, named: 0.95 };
+/** Puntos del scroll tras el logo (0–1), sincronizados con los nombres gigantes. */
+const TIMELINE = { typed: 0.28, eraseStart: 0.45, erased: 0.55, named: 0.72 };
 
 const reveal = (text: string, amount: number) =>
   text.slice(0, Math.round(text.length * clamp(amount)));
