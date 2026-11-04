@@ -18,6 +18,12 @@ html {
   color-scheme: dark;
   background: var(--color-void);
   -webkit-text-size-adjust: 100%;
+  /* Sin barra, el visitante no sabe cuánto falta por descubrir. */
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 body {
