@@ -94,7 +94,8 @@ export class Convergence {
     this.canvas.width = Math.round(width * pixelRatio);
     this.canvas.height = Math.round(height * pixelRatio);
 
-    const fontSize = Math.round(clamp(width / 120, 8, 14) * 2) / 2;
+    // Menos de 10.5 px satura las pantallas pequeñas: más caracteres que dibujar y menos pintura.
+    const fontSize = Math.round(clamp(width / 120, 10.5, 14) * 2) / 2;
     this.atlas = createGlyphAtlas(fontSize, pixelRatio, this.fontFamily);
     const { cellWidth, cellHeight } = this.atlas;
 

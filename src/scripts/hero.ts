@@ -6,6 +6,10 @@ import { Convergence, INTRO_DURATION, type Painting } from "../lib/ascii/converg
 const FONT_FAMILY = '"JetBrains Mono", monospace';
 /** After the intro the painting only breathes, so 30 fps is plenty. */
 const IDLE_FRAME_MS = 1000 / 30;
+/** Los teléfonos reciben menos fotogramas y píxeles: su pantalla ya es densa. */
+const PORTRAIT_IDLE_FRAME_MS = 1000 / 20;
+const MAX_PIXEL_RATIO = 2;
+const PORTRAIT_MAX_PIXEL_RATIO = 1.5;
 /** Below this aspect ratio the vertical composition fits better. */
 const PORTRAIT_QUERY = "(max-aspect-ratio: 6/7)";
 
@@ -40,7 +44,8 @@ export async function mountHero(section: HTMLElement) {
   const layout = async () => {
     const painting = await paintingFor(portrait.matches);
     const { width, height } = canvas.getBoundingClientRect();
-    scene.layout(width, height, Math.min(window.devicePixelRatio || 1, 2), painting);
+    const maxPixelRatio = portrait.matches ? PORTRAIT_MAX_PIXEL_RATIO : MAX_PIXEL_RATIO;
+    scene.layout(width, height, Math.min(window.devicePixelRatio || 1, maxPixelRatio), painting);
     scene.render(elapsed, reducedMotion.matches);
   };
 
@@ -49,7 +54,8 @@ export async function mountHero(section: HTMLElement) {
     elapsed += Math.min((now - (lastFrame || now)) / 1000, 0.1);
     lastFrame = now;
     if (elapsed > INTRO_DURATION) section.dataset.settled ??= "";
-    if (elapsed > INTRO_DURATION && now - lastDraw < IDLE_FRAME_MS) return;
+    const idleFrameMs = portrait.matches ? PORTRAIT_IDLE_FRAME_MS : IDLE_FRAME_MS;
+    if (elapsed > INTRO_DURATION && now - lastDraw < idleFrameMs) return;
     lastDraw = now;
     scene.render(elapsed);
   };
