@@ -42,6 +42,18 @@ body {
   background: var(--color-signal);
 }
 
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+/* Columna de lectura: márgenes en móvil y un ancho cómodo en pantallas grandes. */
+.reading {
+  max-width: calc(68ch + 2 * var(--space-gutter));
+  margin-inline: auto;
+  padding: var(--space-gutter);
+}
+
 :focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 3px;
