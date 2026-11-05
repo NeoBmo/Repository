@@ -1,11 +1,29 @@
 import landscapeUrl from "../assets/starry-night.webp?url";
 import portraitUrl from "../assets/starry-night-portrait.webp?url";
+import logoUrl from "../assets/logo.svg?url";
 import { loadImageField, type ImageField } from "../lib/ascii/image-field";
 import { Convergence, INTRO_DURATION, type Painting } from "../lib/ascii/convergence";
+import { clamp } from "../lib/ascii/math";
+import {
+  DISSOLVE_DURATION,
+  DISSOLVE_START,
+  LOGO_AT,
+  LOGO_SCROLL,
+  MAX_RATE,
+  RATE_RESPONSE,
+  STAGE_RESPONSE,
+  afterLogo,
+  stageAt,
+} from "../lib/choreography";
+import { mountTerminal } from "./terminal";
 
 const FONT_FAMILY = '"JetBrains Mono", monospace';
 /** After the intro the painting only breathes, so 30 fps is plenty. */
 const IDLE_FRAME_MS = 1000 / 30;
+/** Los teléfonos reciben menos fotogramas y píxeles: su pantalla ya es densa. */
+const PORTRAIT_IDLE_FRAME_MS = 1000 / 20;
+const MAX_PIXEL_RATIO = 2;
+const PORTRAIT_MAX_PIXEL_RATIO = 1.5;
 /** Below this aspect ratio the vertical composition fits better. */
 const PORTRAIT_QUERY = "(max-aspect-ratio: 6/7)";
 
@@ -27,6 +45,9 @@ export async function mountHero(section: HTMLElement) {
   const canvas = section.querySelector("canvas");
   if (!canvas) return;
 
+  // Cada carga empieza arriba: la coreografía no puede arrancar a mitad del scroll.
+  history.scrollRestoration = "manual";
+
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const portrait = window.matchMedia(PORTRAIT_QUERY);
   const scene = new Convergence({ canvas, fontFamily: FONT_FAMILY });
@@ -36,21 +57,75 @@ export async function mountHero(section: HTMLElement) {
   let lastDraw = 0;
   let frame = 0;
   let visible = true;
+  let rate = 1;
+  let progress = 0;
+  // Un solo número recorre toda la obra: 0–1 pintura → logo, 1–4 logo → nombres → línea.
+  let position = 0;
+  let drawnPosition = -1;
+  // La intro mantiene el logo hasta que el visitante baja; desde ahí manda el scroll,
+  // así que al volver arriba la pintura se queda quieta y no se disuelve sola.
+  let introHolds = true;
+
+  mountTerminal(section, (value) => (progress = value));
+
+  const logo = new Image();
+  logo.src = logoUrl;
+
+  // Reduced motion siempre muestra la pintura fija, sin importar dónde iba la coreografía.
+  const draw = () => {
+    if (reducedMotion.matches) scene.render(elapsed, true);
+    else if (position > 1) scene.renderFormation(position - 1, elapsed);
+    else scene.render(elapsed, false, position);
+  };
 
   const layout = async () => {
     const painting = await paintingFor(portrait.matches);
     const { width, height } = canvas.getBoundingClientRect();
-    scene.layout(width, height, Math.min(window.devicePixelRatio || 1, 2), painting);
-    scene.render(elapsed, reducedMotion.matches);
+    const maxPixelRatio = portrait.matches ? PORTRAIT_MAX_PIXEL_RATIO : MAX_PIXEL_RATIO;
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
+    scene.layout(width, height, pixelRatio, painting, logo, portrait.matches);
+    draw();
+    drawnPosition = position;
   };
 
   const tick = (now: number) => {
     frame = requestAnimationFrame(tick);
-    elapsed += Math.min((now - (lastFrame || now)) / 1000, 0.1);
+    const delta = Math.min((now - (lastFrame || now)) / 1000, 0.1);
     lastFrame = now;
-    if (elapsed > INTRO_DURATION && now - lastDraw < IDLE_FRAME_MS) return;
+
+    const introRunning = elapsed < LOGO_AT;
+    const targetRate = introRunning && progress > 0 ? MAX_RATE : 1;
+    rate += (targetRate - rate) * Math.min(delta * RATE_RESPONSE, 1);
+    elapsed += delta * rate;
+
+    // Quien baja más allá del hero durante la intro la deja terminar antes de pausar.
+    if (!visible && !introRunning) {
+      pause();
+      return;
+    }
+
+    if (!introRunning && progress >= LOGO_SCROLL) introHolds = false;
+    const dissolve = introHolds
+      ? clamp((elapsed - DISSOLVE_START) / DISSOLVE_DURATION)
+      : clamp(progress / LOGO_SCROLL);
+    const target = dissolve + (introRunning ? 0 : stageAt(afterLogo(progress)));
+
+    // La intro va exacta al reloj; después los caracteres persiguen al scroll,
+    // así que incluso un salto brusco, en cualquier sentido, viaja suave.
+    if (introRunning) position = target;
+    else position += (target - position) * Math.min(delta * STAGE_RESPONSE, 1);
+    if (Math.abs(target - position) < 0.001) position = target;
+
+    if (position === drawnPosition) {
+      if (position >= 1) return;
+      const idleFrameMs = portrait.matches ? PORTRAIT_IDLE_FRAME_MS : IDLE_FRAME_MS;
+      if (elapsed > INTRO_DURATION && now - lastDraw < idleFrameMs) return;
+    }
+
+    section.toggleAttribute("data-settled", position >= 1);
+    drawnPosition = position;
     lastDraw = now;
-    scene.render(elapsed);
+    draw();
   };
 
   const play = () => {
@@ -64,7 +139,7 @@ export async function mountHero(section: HTMLElement) {
     frame = 0;
   };
 
-  await document.fonts.load(`600 12px ${FONT_FAMILY}`);
+  await Promise.all([document.fonts.load(`600 12px ${FONT_FAMILY}`), logo.decode().catch(() => {})]);
   await layout();
 
   let resizeTimer = 0;
@@ -75,16 +150,20 @@ export async function mountHero(section: HTMLElement) {
 
   new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
-    visible ? play() : pause();
+    if (visible) play();
+    else if (elapsed >= LOGO_AT) pause();
   }).observe(section);
 
   document.addEventListener("visibilitychange", () => (document.hidden ? pause() : play()));
   reducedMotion.addEventListener("change", () => {
     pause();
-    scene.render(elapsed, reducedMotion.matches);
+    section.toggleAttribute("data-settled", reducedMotion.matches);
+    drawnPosition = -1;
+    draw();
     play();
   });
 
+  section.toggleAttribute("data-settled", reducedMotion.matches);
   section.dataset.ready = "";
   play();
 }

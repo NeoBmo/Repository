@@ -27,6 +27,35 @@ const POINTS = STROKE_STEPS + 2;
 /** Share of the journey spent flying from the noise into the stroke. */
 const SWEEP = 0.3;
 
+/** Tamaño máximo y altura del logo, como proporción de la pantalla. */
+const LOGO_WIDTH = 0.85;
+const LOGO_HEIGHT = 0.5;
+const LOGO_TOP = 0.42;
+/** Parte de la disolución que dura el viaje de cada carácter hasta el logo. */
+const LOGO_TRAVEL = 0.6;
+/** Curvatura del viaje: sale siguiendo su pincelada antes de ir al logo. */
+const LOGO_ARC = 0.25;
+const LOGO_GLYPH = glyphFor(1, 0, 0);
+const LINE_GLYPH = glyphFor(0.5, 0, 1);
+
+/** Ancho y alto máximos de los nombres gigantes, y altura de la línea de salida. */
+const TEXT_WIDTH = 0.86;
+const TEXT_HEIGHT = 0.42;
+const TEXT_LINE_HEIGHT = 1.1;
+const EXIT_LINE_TOP = 0.8;
+/** En pantallas verticales los nombres usan caracteres más pequeños para leerse. */
+const PORTRAIT_TEXT_SCALE = 0.55;
+
+/** Una figura hecha de caracteres: el carácter `order[j]` va a la posición `j`. */
+interface Formation {
+  x: Float32Array;
+  y: Float32Array;
+  size: number;
+  glyph: number;
+  /** Tamaño de cada carácter respecto a su celda. */
+  scale: number;
+}
+
 export interface ConvergenceOptions {
   canvas: HTMLCanvasElement;
   fontFamily: string;
@@ -75,6 +104,14 @@ export class Convergence {
   private luminance = new Float32Array(0);
   private angle = new Float32Array(0);
   private coherence = new Float32Array(0);
+  private inLogo = new Uint8Array(0);
+  private logoX = new Float32Array(0);
+  private logoY = new Float32Array(0);
+  private logoDelay = new Float32Array(0);
+  private fade = new Float32Array(0);
+  private order = new Uint32Array(0);
+  private formations: Formation[] = [];
+  private portrait = false;
 
   constructor({ canvas, fontFamily, seed = 1890 }: ConvergenceOptions) {
     const context = canvas.getContext("2d");
@@ -85,7 +122,15 @@ export class Convergence {
     this.seed = seed;
   }
 
-  layout(width: number, height: number, pixelRatio: number, painting: Painting) {
+  layout(
+    width: number,
+    height: number,
+    pixelRatio: number,
+    painting: Painting,
+    logo: HTMLImageElement,
+    portrait: boolean,
+  ) {
+    this.portrait = portrait;
     this.field = painting.field;
     this.focus = painting.focus;
     this.width = width;
@@ -94,7 +139,8 @@ export class Convergence {
     this.canvas.width = Math.round(width * pixelRatio);
     this.canvas.height = Math.round(height * pixelRatio);
 
-    const fontSize = Math.round(clamp(width / 120, 8, 14) * 2) / 2;
+    // Menos de 10.5 px satura las pantallas pequeñas: más caracteres que dibujar y menos pintura.
+    const fontSize = Math.round(clamp(width / 120, 10.5, 14) * 2) / 2;
     this.atlas = createGlyphAtlas(fontSize, pixelRatio, this.fontFamily);
     const { cellWidth, cellHeight } = this.atlas;
 
@@ -112,15 +158,81 @@ export class Convergence {
     };
 
     this.populate(this.sampleCells());
+    this.buildFormations(logo);
   }
 
-  /** Draws the scene at `time` seconds. `still` skips motion entirely. */
-  render(time: number, still = false) {
+  /**
+   * Dibuja el viaje entre formaciones. `stage` 1.5 es la mitad del camino entre
+   * la formación 1 y la 2, así que el scroll puede moverla en ambos sentidos.
+   */
+  renderFormation(stage: number, time: number) {
+    const { context, atlas, formations, order } = this;
+    const { cellWidth, cellHeight, sourceWidth, sourceHeight } = atlas;
+    const from = clamp(Math.floor(stage), 0, formations.length - 2);
+    const mix = clamp(stage - from);
+    const start = formations[from];
+    const end = formations[from + 1];
+
+    context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+    context.globalCompositeOperation = "source-over";
+    context.globalAlpha = 1;
+    context.clearRect(0, 0, this.width, this.height);
+
+    const flicker = Math.floor(time * 12);
+    const total = Math.max(start.size, end.size);
+
+    for (let j = 0; j < total; j++) {
+      const n = order[j];
+      const inStart = j < start.size;
+      const inEnd = j < end.size;
+      let x: number;
+      let y: number;
+      let glyph: number;
+      let scale: number;
+
+      if (inStart && inEnd) {
+        const local = easeInOutCubic(clamp((mix - this.logoDelay[n]) / LOGO_TRAVEL));
+        x = lerp(start.x[j], end.x[j], local);
+        y = lerp(start.y[j], end.y[j], local);
+        scale = lerp(start.scale, end.scale, local);
+        if (local < 0.1) glyph = start.glyph;
+        else if (local > 0.9) glyph = end.glyph;
+        else glyph = NOISE_INDEX[(flicker + ((this.noise[n] * 997) | 0)) % NOISE_INDEX.length];
+      } else if (inStart) {
+        if (mix > this.fade[n]) continue;
+        x = start.x[j];
+        y = start.y[j];
+        glyph = start.glyph;
+        scale = start.scale;
+      } else {
+        if (mix < 1 - this.fade[n]) continue;
+        x = end.x[j];
+        y = end.y[j];
+        glyph = end.glyph;
+        scale = end.scale;
+      }
+
+      const drawWidth = cellWidth * scale;
+      const drawHeight = cellHeight * scale;
+      context.drawImage(
+        atlas.canvas,
+        glyph * sourceWidth, 0, sourceWidth, sourceHeight,
+        x - drawWidth / 2, y - drawHeight / 2, drawWidth, drawHeight,
+      );
+    }
+  }
+
+  /**
+   * Draws the scene at `time` seconds. `still` skips motion entirely.
+   * `dissolve` (0–1) lleva de la pintura al logo y funciona en ambos sentidos.
+   */
+  render(time: number, still = false, dissolve = 0) {
     const { context, atlas } = this;
     const { cellWidth, cellHeight, sourceWidth, sourceHeight } = atlas;
     const t = still ? Infinity : time;
     const life = still ? 0 : smoothstep(TIMING.lifeStart, TIMING.lifeStart + TIMING.lifeDuration, t);
-    const color = still ? 1 : easeInOutCubic(clamp((t - TIMING.colorStart) / TIMING.colorDuration));
+    const base = still ? 1 : easeInOutCubic(clamp((t - TIMING.colorStart) / TIMING.colorDuration));
+    const color = base * (1 - dissolve);
 
     context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
     context.globalCompositeOperation = "source-over";
@@ -133,12 +245,23 @@ export class Convergence {
 
     for (let i = 0; i < this.count; i++) {
       if (t < this.appear[i]) continue;
+      // Los caracteres que no forman el logo desaparecen uno a uno, sin transparencia.
+      if (!this.inLogo[i] && dissolve > this.fade[i]) continue;
+      const toLogo = this.inLogo[i]
+        ? easeInOutCubic(clamp((dissolve - this.logoDelay[i]) / LOGO_TRAVEL))
+        : 0;
       const progress = easeInOutCubic(clamp((t - this.departure[i]) / TIMING.travel));
       let x: number;
       let y: number;
       let glyph: number;
 
-      if (progress >= 1) {
+      if (toLogo > 0) {
+        [x, y] = this.logoPositionAt(i, toLogo);
+        glyph =
+          toLogo > 0.9
+            ? LOGO_GLYPH
+            : NOISE_INDEX[(flicker + ((this.noise[i] * 997) | 0)) % NOISE_INDEX.length];
+      } else if (progress >= 1) {
         const wave = life > 0 ? Math.sin(this.phase[i] - time * 1.4) * life : 0;
         const drift = wave * 0.2 * cellWidth;
         x = this.homeX[i] + this.dirX[i] * drift;
@@ -296,6 +419,145 @@ export class Convergence {
     }
   }
 
+  /** Prepara las figuras en orden: logo, NeoBmo, Luis Rodríguez y línea de salida. */
+  private buildFormations(logo: HTMLImageElement) {
+    const { count } = this;
+    const random = createRandom(this.seed + 1);
+
+    this.inLogo = new Uint8Array(count);
+    this.logoX = new Float32Array(count);
+    this.logoY = new Float32Array(count);
+    this.logoDelay = new Float32Array(count);
+    this.fade = new Float32Array(count);
+
+    for (let n = 0; n < count; n++) {
+      this.logoDelay[n] = random() * (1 - LOGO_TRAVEL);
+      this.fade[n] = 0.1 + random() * 0.8;
+    }
+
+    // El mismo orden en todas: los caracteres compartidos viajan de una figura a otra.
+    this.order = Uint32Array.from({ length: count }, (_, i) => i);
+    for (let i = count - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [this.order[i], this.order[j]] = [this.order[j], this.order[i]];
+    }
+
+    const name = this.portrait ? ["Luis", "Rodríguez"] : ["Luis Rodríguez"];
+    this.formations = [this.logoFormation(logo), this.textFormation(["NeoBmo"]), this.textFormation(name), this.lineFormation()];
+
+    const [logoShape] = this.formations;
+    for (let j = 0; j < logoShape.size; j++) {
+      const n = this.order[j];
+      this.inLogo[n] = 1;
+      this.logoX[n] = logoShape.x[j];
+      this.logoY[n] = logoShape.y[j];
+    }
+  }
+
+  private logoFormation(logo: HTMLImageElement) {
+    const { width, height } = this;
+    const { cellWidth, cellHeight } = this.atlas;
+    const size = Math.min(width * LOGO_WIDTH, height * LOGO_HEIGHT);
+    const cols = Math.round(size / cellWidth);
+    const rows = Math.round(size / cellHeight);
+    // Sin logo cargado o sin espacio, la pintura se disuelve igual y llega la consola.
+    if (!logo.naturalWidth || cols < 1 || rows < 1) return emptyFormation();
+
+    return this.maskFormation(cols, rows, 1, LOGO_TOP, (context) => {
+      context.drawImage(logo, 0, 0, cols, rows);
+    });
+  }
+
+  private textFormation(lines: string[]) {
+    const { width, height, fontFamily } = this;
+    const scale = this.portrait ? PORTRAIT_TEXT_SCALE : 1;
+    const cellWidth = this.atlas.cellWidth * scale;
+    const cellHeight = this.atlas.cellHeight * scale;
+    const cols = Math.ceil(width / cellWidth);
+    const rows = Math.ceil(height / cellHeight);
+    if (cols < 1 || rows < 1) return emptyFormation();
+
+    return this.maskFormation(cols, rows, scale, 0.5, (context) => {
+      const measure = 100;
+      context.scale(1 / cellWidth, 1 / cellHeight);
+      context.font = `700 ${measure}px ${fontFamily}`;
+      const widest = Math.max(...lines.map((line) => context.measureText(line).width));
+      const fontSize = Math.min(
+        (width * TEXT_WIDTH * measure) / widest,
+        (height * TEXT_HEIGHT) / (lines.length * TEXT_LINE_HEIGHT),
+      );
+      const lineHeight = fontSize * TEXT_LINE_HEIGHT;
+      const top = height * LOGO_TOP - ((lines.length - 1) * lineHeight) / 2;
+
+      context.font = `700 ${fontSize}px ${fontFamily}`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      lines.forEach((line, index) => context.fillText(line, width / 2, top + index * lineHeight));
+    });
+  }
+
+  private lineFormation() {
+    const { cols, height } = this;
+    const { cellWidth } = this.atlas;
+    const size = Math.min(cols, this.count);
+    const x = new Float32Array(size);
+    const y = new Float32Array(size).fill(height * EXIT_LINE_TOP);
+    for (let j = 0; j < size; j++) x[j] = this.gridX + (j + 0.5) * cellWidth;
+    return { x, y, size, glyph: LINE_GLYPH, scale: 1 };
+  }
+
+  /** Convierte en celdas lo que `draw` pinta en una capa del tamaño de la figura. */
+  private maskFormation(
+    cols: number,
+    rows: number,
+    scale: number,
+    topRatio: number,
+    draw: (context: CanvasRenderingContext2D) => void,
+  ): Formation {
+    const { width, height, count } = this;
+    const cellWidth = this.atlas.cellWidth * scale;
+    const cellHeight = this.atlas.cellHeight * scale;
+    const layer = document.createElement("canvas");
+    layer.width = cols;
+    layer.height = rows;
+    const context = layer.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("2D canvas is not available");
+    context.fillStyle = "#fff";
+    draw(context);
+    const { data } = context.getImageData(0, 0, cols, rows);
+
+    const left = (width - cols * cellWidth) / 2;
+    const top = (height - rows * cellHeight) * topRatio;
+    const x = new Float32Array(count);
+    const y = new Float32Array(count);
+    let size = 0;
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols && size < count; col++) {
+        if (data[(row * cols + col) * 4 + 3] < 128) continue;
+        x[size] = left + (col + 0.5) * cellWidth;
+        y[size] = top + (row + 0.5) * cellHeight;
+        size++;
+      }
+    }
+
+    return { x, y, size, glyph: LOGO_GLYPH, scale };
+  }
+
+  private logoPositionAt(n: number, progress: number): [number, number] {
+    const startX = this.homeX[n];
+    const startY = this.homeY[n];
+    const endX = this.logoX[n];
+    const endY = this.logoY[n];
+    const distance = Math.hypot(endX - startX, endY - startY);
+    const controlX = (startX + endX) / 2 + this.dirX[n] * distance * LOGO_ARC;
+    const controlY = (startY + endY) / 2 + this.dirY[n] * distance * LOGO_ARC;
+    return [
+      lerp(lerp(startX, controlX, progress), lerp(controlX, endX, progress), progress),
+      lerp(lerp(startY, controlY, progress), lerp(controlY, endY, progress), progress),
+    ];
+  }
+
   private positionAt(n: number, progress: number): [number, number] {
     const base = n * POINTS * 2;
     const path = this.path;
@@ -319,6 +581,14 @@ export class Convergence {
     return iy * width + ix;
   }
 }
+
+const emptyFormation = (): Formation => ({
+  x: new Float32Array(0),
+  y: new Float32Array(0),
+  size: 0,
+  glyph: LOGO_GLYPH,
+  scale: 1,
+});
 
 /**
  * Stretches luminance between its 2nd and 98th percentiles, then lifts the

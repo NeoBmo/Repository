@@ -18,6 +18,12 @@ html {
   color-scheme: dark;
   background: var(--color-void);
   -webkit-text-size-adjust: 100%;
+  /* Sin barra, el visitante no sabe cuánto falta por descubrir. */
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar {
+  display: none;
 }
 
 body {
@@ -34,6 +40,18 @@ body {
 ::selection {
   color: var(--color-void);
   background: var(--color-signal);
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+/* Columna de lectura: márgenes en móvil y un ancho cómodo en pantallas grandes. */
+.reading {
+  max-width: calc(68ch + 2 * var(--space-gutter));
+  margin-inline: auto;
+  padding: var(--space-gutter);
 }
 
 :focus-visible {
